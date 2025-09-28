@@ -20,16 +20,16 @@ return [
         ->js(__DIR__ . '/js/dist/forum.js')
         ->css(__DIR__ . '/less/forum.less'),
 
-    // 序列化到 API（给前台/管理端可读取的用户与站点属性）
+    // API 序列化
     (new Extend\ApiSerializer(UserSerializer::class))
         ->attributes(AddUserCheckinAttributes::class),
     (new Extend\ApiSerializer(ForumSerializer::class))
         ->attributes(AddUserCheckinAttributes::class),
 
-    // 设置项序列化（保持你原有键名，另新增 EXP 与连签奖励相关键）
+    // 设置序列化
     (new Extend\Settings())
         // —— 原有 —— //
-        ->serializeToForum('forumCheckinRewarMoney', 'ziven-forum-checkin.checkinRewardMoney', function ($raw) { // 注意原插件键名拼写保持不变
+        ->serializeToForum('forumCheckinRewarMoney', 'ziven-forum-checkin.checkinRewardMoney', function ($raw) {
             return (float) $raw;
         })
         ->serializeToForum('forumAutoCheckin', 'ziven-forum-checkin.autoCheckIn', 'intval', 0)
@@ -47,11 +47,11 @@ return [
         })
         ->serializeToForum('forumCheckinStreakBonusMaxDays', 'ziven-forum-checkin.streakBonusMaxDays', 'intval', 0),
 
-    // 权限策略
+    // ✅ 正确写法：使用 modelPolicy 绑定策略
     (new Extend\Policy())
-        ->model(\Flarum\User\User::class, UserPolicy::class),
+        ->modelPolicy(\Flarum\User\User::class, UserPolicy::class),
 
-    // 事件监听：Saving 阶段执行签到落库；签到完成事件上发 EXP 与连签额外 money
+    // 事件监听
     (new Extend\Event())
         ->listen(Saving::class, [doCheckin::class, 'checkinSaved'])
         ->listen(checkinUpdated::class, [AwardXpOnCheckin::class, 'handle'])
