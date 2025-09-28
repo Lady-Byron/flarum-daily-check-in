@@ -20,13 +20,20 @@ return [
         ->js(__DIR__ . '/js/dist/forum.js')
         ->css(__DIR__ . '/less/forum.less'),
 
-    // API 序列化
+    // 语言包（原插件就有，保留）
+    (new Extend\Locales(__DIR__ . '/locale')),
+
+    // 仅给 User 序列化器注入用户相关属性（避免类型不匹配）
     (new Extend\ApiSerializer(UserSerializer::class))
         ->attributes(AddUserCheckinAttributes::class),
-    (new Extend\ApiSerializer(ForumSerializer::class))
-        ->attributes(AddUserCheckinAttributes::class),
 
-    // 设置序列化
+    // 给 Forum 序列化器下发论坛级属性：allowCheckIn（沿用原插件的闭包写法）
+    (new Extend\ApiSerializer(ForumSerializer::class))
+        ->attribute('allowCheckIn', function (ForumSerializer $serializer) {
+            return $serializer->getActor()->hasPermission('checkin.allowCheckIn');
+        }),
+
+    // 设置项序列化到 forum 数据（前端读取）
     (new Extend\Settings())
         // —— 原有 —— //
         ->serializeToForum('forumCheckinRewarMoney', 'ziven-forum-checkin.checkinRewardMoney', function ($raw) {
@@ -39,7 +46,7 @@ return [
         ->serializeToForum('forumCheckinSuccessPromptText', 'ziven-forum-checkin.checkinSuccessPromptText')
         ->serializeToForum('forumCheckinSuccessPromptRewardText', 'ziven-forum-checkin.checkinSuccessPromptRewardText')
 
-        // —— 新增：基础 EXP 与连签奖励设置 —— //
+        // —— 新增（经验 & 连签加成） —— //
         ->serializeToForum('forumCheckinRewardExp', 'ziven-forum-checkin.checkinRewardExp', 'intval', 0)
         ->serializeToForum('forumCheckinStreakBonusExpPerDay', 'ziven-forum-checkin.streakBonusExpPerDay', 'intval', 0)
         ->serializeToForum('forumCheckinStreakBonusMoneyPerDay', 'ziven-forum-checkin.streakBonusMoneyPerDay', function ($raw) {
@@ -47,11 +54,11 @@ return [
         })
         ->serializeToForum('forumCheckinStreakBonusMaxDays', 'ziven-forum-checkin.streakBonusMaxDays', 'intval', 0),
 
-    // ✅ 正确写法：使用 modelPolicy 绑定策略
+    // 权限策略
     (new Extend\Policy())
         ->modelPolicy(\Flarum\User\User::class, UserPolicy::class),
 
-    // 事件监听
+    // 事件监听：Saving 阶段执行签到落库；签到完成事件上发 EXP 与连签额外 money
     (new Extend\Event())
         ->listen(Saving::class, [doCheckin::class, 'checkinSaved'])
         ->listen(checkinUpdated::class, [AwardXpOnCheckin::class, 'handle'])
