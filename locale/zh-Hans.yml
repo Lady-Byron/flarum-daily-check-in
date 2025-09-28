@@ -22,3 +22,11 @@ ziven-checkin:
       None: 无
       Alert: Alert
       Modal: Modal
+      reward-exp: "每次签到经验值"
+      reward-exp-help: "用户每次成功签到时增加的基础经验（需安装 foskym/flarum-custom-levels）。设为 0 关闭。"
+      streak-exp-per-day: "连续签到额外经验 / 天"
+      streak-exp-per-day-help: "从第2天起，每天在基础经验上额外增加的经验值（线性）。"
+      streak-money-per-day: "连续签到额外金币 / 天"
+      streak-money-per-day-help: "从第2天起，每天在基础金币上额外增加的金币数（线性）。"
+      streak-max-days: "连续加成封顶天数"
+      streak-max-days-help: "用于计算“每日额外”加成的最大连续天数。0 表示不封顶。"
