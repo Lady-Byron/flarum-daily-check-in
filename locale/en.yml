@@ -22,3 +22,11 @@ ziven-checkin:
       None: None
       Alert: Alert
       Modal: Modal
+      reward-exp: "EXP per check-in"
+      reward-exp-help: "Base EXP granted on each successful check-in (requires foskym/flarum-custom-levels). Set 0 to disable."
+      streak-exp-per-day: "Streak bonus EXP per day"
+      streak-exp-per-day-help: "Starting from day 2, extra EXP added per consecutive day (linear)."
+      streak-money-per-day: "Streak bonus money per day"
+      streak-money-per-day-help: "Starting from day 2, extra money added per consecutive day (linear)."
+      streak-max-days: "Streak bonus cap (days)"
+      streak-max-days-help: "Maximum consecutive days considered for the per-day bonuses. 0 means unlimited."
