@@ -6,15 +6,6 @@ use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Contracts\Events\Dispatcher;
 use Ziven\checkin\Event\checkinUpdated;
 
-/**
- * 在每日签到完成后，给用户增加自定义等级系统的经验。
- * 软依赖 foskym/flarum-custom-levels：未安装则静默跳过。
- *
- * 设计要点：
- * - 不调用 save()，仅修改传入的 $event->user 对象的 exp，
- *   交由外层保存流程统一落库，避免递归触发 Saving。
- * - 派发 ExpUpdated 事件，让对方扩展完成日志/升级/通知等副作用。
- */
 class AwardXpOnCheckin
 {
     protected SettingsRepositoryInterface $settings;
@@ -29,35 +20,39 @@ class AwardXpOnCheckin
     public function handle(checkinUpdated $event): void
     {
         $user = $event->user;
-        if (!$user) {
-            return;
-        }
+        if (!$user) return;
 
-        // 软依赖：未安装自定义等级扩展则跳过
-        if (!class_exists(\FoskyM\CustomLevels\Event\ExpUpdated::class)) {
-            return;
-        }
+        // 软依赖：未安装自定义等级系统则跳过
+        if (!class_exists(\FoskyM\CustomLevels\Event\ExpUpdated::class)) return;
 
-        $xp = (int) ($this->settings->get('ziven-forum-checkin.checkinRewardExp') ?? 0);
-        if ($xp <= 0) {
-            return;
-        }
+        $baseExp     = (int) ($this->settings->get('ziven-forum-checkin.checkinRewardExp') ?? 0);
+        $bonusPerDay = (int) ($this->settings->get('ziven-forum-checkin.streakBonusExpPerDay') ?? 0);
+        $maxDays     = (int) ($this->settings->get('ziven-forum-checkin.streakBonusMaxDays') ?? 0);
 
-        // 修改同一 User 模型实例，交由外层保存
-        $currentExp = (int) ($user->exp ?? 0);
-        $user->exp  = $currentExp + $xp;
+        $streak = (int) ($user->total_continuous_checkin_count ?? 0);
+        $eff    = $maxDays > 0 ? min($streak, $maxDays) : $streak;
 
-        // 附加一些上下文信息，便于对方日志区分来源
-        $relationship = [
-            'source' => 'daily_check_in',
-            'streak' => (int) ($user->total_continuous_checkin_count ?? 0),
-            'total'  => (int) ($user->total_checkin_count ?? 0),
-            'date'   => date('Y-m-d'),
-        ];
+        // 从第 2 天开始算“额外”，线性：bonus = (eff - 1) * bonusPerDay
+        $bonusExp = max(0, $eff - 1) * max(0, $bonusPerDay);
+        $xp       = $baseExp + $bonusExp;
 
-        // 让自定义等级扩展完成日志与升级通知
-        $this->events->dispatch(
-            new \FoskyM\CustomLevels\Event\ExpUpdated($user, $xp, 'daily_check_in', $relationship)
-        );
+        if ($xp <= 0) return;
+
+        // 不立即 save，交由外层 Saving 流程统一保存，避免递归
+        $user->exp = (int) ($user->exp ?? 0) + $xp;
+
+        $this->events->dispatch(new \FoskyM\CustomLevels\Event\ExpUpdated(
+            $user,
+            $xp,
+            'daily_check_in',
+            [
+                'source'          => 'daily_check_in',
+                'base_exp'        => $baseExp,
+                'streak_days'     => $streak,
+                'streak_bonus'    => $bonusExp,
+                'streak_eff_days' => $eff,
+                'date'            => date('Y-m-d'),
+            ]
+        ));
     }
 }
