@@ -17,6 +17,20 @@ export default class checkInResultModal extends Modal {
     );
   }
 
+  // 把字符串中的 \n 处理成 <br/>。既支持字面量 "\n"，也支持真实换行。
+  renderWithBreaks(str) {
+    const normalized = String(str ?? '')
+      .replace(/\\n/g, '\n');       // 把字面量 \n 变成真实换行符
+    const parts = normalized.split(/\r?\n/g);
+
+    const nodes = [];
+    parts.forEach((part, i) => {
+      if (i) nodes.push(<br />);
+      nodes.push(part);
+    });
+    return nodes;
+  }
+
   content() {
     const u = app.session.user;
 
@@ -30,36 +44,33 @@ export default class checkInResultModal extends Modal {
     const capDays     = Number(app.forum.attribute('forumCheckinStreakBonusMaxDays') || 0);
 
     // 有效参与加成的连续天数（考虑封顶）
-    const effDays = capDays > 0 ? Math.min(days, capDays) : days;
+    const effDays     = capDays > 0 ? Math.min(days, capDays) : days;
 
     // 连签从第2天起才有加成
-    const bonusExp   = Math.max(0, effDays - 1) * Math.max(0, bonusExpDay);
-    const bonusMoney = Math.max(0, effDays - 1) * Math.max(0, bonusMonDay);
+    const bonusExp    = Math.max(0, effDays - 1) * Math.max(0, bonusExpDay);
+    const bonusMoney  = Math.max(0, effDays - 1) * Math.max(0, bonusMonDay);
+    const totalExp    = baseExp + bonusExp;
+    const totalMoney  = baseMoney + bonusMoney;
 
-    const totalExp   = baseExp + bonusExp;
-    const totalMoney = baseMoney + bonusMoney;
-
-    const forumCheckinSuccessPromptText        = app.forum.attribute('forumCheckinSuccessPromptText') || '';
-    const forumCheckinSuccessPromptRewardText  = app.forum.attribute('forumCheckinSuccessPromptRewardText') || '';
+    const tplText     = app.forum.attribute('forumCheckinSuccessPromptText') || '';
+    const tplReward   = app.forum.attribute('forumCheckinSuccessPromptRewardText') || '';
 
     // money 扩展支持
     const moneyNameSetting = app.forum.attribute('antoinefr-money.moneyname'); // 可能是 "金币" 或 "[money] 金币"
     const moneyExtPresent  = typeof moneyNameSetting !== 'undefined';
 
-    // 将金额数值按 money 扩展的命名格式渲染成人类可读字符串
+    // 将金额按 money 扩展命名渲染
     const renderMoney = (val) => {
       const n = Number(val).toString();
       const name = moneyNameSetting || '';
-      if (!name) return n; // 无名称就只返回数字
+      if (!name) return n;
       if (name.includes('[money]')) return name.replace(/\[money\]/g, n);
       return `${n} ${name}`;
     };
 
-    // 占位符替换函数
+    // 占位符替换
     const replacePlaceholders = (tpl) => {
       if (!tpl) return '';
-
-      // 先处理 money/exp 等明确占位符
       let out = tpl
         .replace(/\[days\]/g, String(days))
         .replace(/\[eff_days\]/g, String(effDays))
@@ -77,18 +88,17 @@ export default class checkInResultModal extends Modal {
       return out;
     };
 
-    const successText = replacePlaceholders(forumCheckinSuccessPromptText);
-    const rewardText  = replacePlaceholders(forumCheckinSuccessPromptRewardText);
+    const successText = replacePlaceholders(tplText);
+    const rewardText  = replacePlaceholders(tplReward);
 
     const successTextClassName = successText ? 'checkInResultModal successText' : 'checkInResultModal hideText';
     const rewardTextClassName  = rewardText ? 'checkInResultModal rewardText'  : 'checkInResultModal hideText';
 
     return (
       <div className="Modal-body">
-        <div className={successTextClassName}>{successText}</div>
-        <div className={rewardTextClassName}>{rewardText}</div>
+        <div className={successTextClassName}>{this.renderWithBreaks(successText)}</div>
+        <div className={rewardTextClassName}>{this.renderWithBreaks(rewardText)}</div>
       </div>
     );
   }
 }
-
